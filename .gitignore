@@ -1,0 +1,17 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Secrets / sesi (jangan pernah di-commit)
+.env
+cookies.txt
+spotdown_session.json
+spowload_session.json
+
+# Cache / output
+audio/
+*.log
+.DS_Store

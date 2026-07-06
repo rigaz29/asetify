@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <meta name="theme-color" content="#0a0a0a" />
+  <title>Asetify</title>
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/static/icon-192.png" />
+  <link rel="apple-touch-icon" href="/static/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Asetify" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+    /* slider */
+    input[type=range] {
+      -webkit-appearance: none; appearance: none;
+      height: 5px; border-radius: 999px; background: #4b5563; cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%;
+      background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.2); transition: transform .1s;
+    }
+    input[type=range]:hover::-webkit-slider-thumb { transform: scale(1.25); }
+    input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border: none; border-radius: 50%; background: #fff; }
+    .group-hover-green:hover input[type=range] { background: linear-gradient(to right,#1db954 var(--val,0%),#4b5563 var(--val,0%)) !important; }
+  </style>
+</head>
+<body class="bg-neutral-950 text-neutral-100 flex flex-col overflow-hidden" style="height:100dvh">
+
+  <!-- Header -->
+  <header class="px-3 sm:px-4 py-3 flex items-center gap-3 border-b border-neutral-800 shrink-0">
+    <h1 class="text-lg sm:text-xl font-bold text-green-500 shrink-0 flex items-center gap-1">
+      <i class="ph-fill ph-music-notes"></i><span class="hidden xs:inline sm:inline">Asetify</span>
+    </h1>
+    <form id="searchForm" class="flex-1 max-w-md">
+      <div class="relative">
+        <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"></i>
+        <input id="searchInput" type="search" placeholder="Cari lagu atau artis…"
+          class="w-full bg-neutral-800 rounded-full pl-9 pr-4 py-2 text-sm outline-none focus:ring-2 focus:ring-green-500" />
+      </div>
+    </form>
+    <button id="installBtn" class="hidden shrink-0 items-center gap-1 text-sm px-3 py-1.5 rounded-full bg-green-600 hover:bg-green-500 text-white font-medium transition" title="Pasang aplikasi">
+      <i class="ph ph-download-simple text-base"></i><span class="hidden sm:inline">Install</span>
+    </button>
+  </header>
+
+  <!-- Kategori -->
+  <nav class="px-3 sm:px-4 py-2 flex gap-2 overflow-x-auto shrink-0 no-scrollbar">
+    <button data-type="global" data-title="Top Global" class="cat px-4 py-1.5 rounded-full bg-neutral-800 hover:bg-neutral-700 text-sm whitespace-nowrap transition">Top Global</button>
+    <button data-type="trending_id" data-title="Trending Indonesia" class="cat px-4 py-1.5 rounded-full bg-neutral-800 hover:bg-neutral-700 text-sm whitespace-nowrap transition">Trending Indonesia</button>
+    <button data-type="trending_yogya" data-title="Lagu Jawa" class="cat px-4 py-1.5 rounded-full bg-neutral-800 hover:bg-neutral-700 text-sm whitespace-nowrap transition">Lagu Jawa</button>
+  </nav>
+
+  <!-- List -->
+  <main class="flex-1 overflow-hidden flex flex-col px-2 sm:px-4">
+    <div class="flex items-center gap-2 mb-2 px-1">
+      <button id="backBtn" class="hidden text-neutral-400 hover:text-white shrink-0" title="Kembali ke hasil pencarian"><i class="ph ph-arrow-left text-xl"></i></button>
+      <h2 id="sectionTitle" class="text-base sm:text-lg font-semibold truncate">Top Global</h2>
+    </div>
+    <div id="trackList" class="flex-1 overflow-y-auto pb-4 space-y-0.5"></div>
+    <div id="lyricsView" class="hidden flex-1 overflow-y-auto pb-24 px-2 text-base sm:text-lg leading-relaxed"></div>
+    <div id="queueView" class="hidden flex-1 overflow-y-auto pb-4 space-y-0.5"></div>
+  </main>
+
+  <!-- Player -->
+  <footer class="border-t border-neutral-800 bg-neutral-900/95 backdrop-blur px-2 sm:px-4 pt-2 pb-3 shrink-0">
+    <!-- baris progress (selalu full width) -->
+    <div class="flex items-center gap-2 mb-2">
+      <span id="curTime" class="text-[11px] text-neutral-400 w-10 text-right tabular-nums">0:00</span>
+      <input id="seek" type="range" min="0" max="100" value="0" step="0.1" class="flex-1" aria-label="Seek" />
+      <span id="durTime" class="text-[11px] text-neutral-400 w-10 tabular-nums">0:00</span>
+    </div>
+
+    <!-- baris kontrol -->
+    <div class="flex items-center gap-2 sm:gap-3">
+      <!-- kiri: info lagu -->
+      <div class="flex items-center gap-3 flex-1 min-w-0">
+        <img id="pCover" alt="" class="w-12 h-12 sm:w-14 sm:h-14 rounded-md object-cover bg-neutral-800 shrink-0" />
+        <div class="min-w-0">
+          <div id="pTitle" class="text-sm font-medium truncate">Belum ada lagu</div>
+          <div id="pArtist" class="text-xs text-neutral-400 truncate">Pilih lagu untuk mulai</div>
+        </div>
+      </div>
+
+      <!-- tengah: transport -->
+      <div class="flex items-center gap-1 sm:gap-3 shrink-0">
+        <button id="autoplayBtn" class="hidden sm:flex text-green-500 hover:text-white p-2" title="Autoplay — queue radio otomatis"><i class="ph ph-infinity text-lg"></i></button>
+        <button id="modeBtn" class="hidden sm:flex text-neutral-400 hover:text-white p-2" title="Mode putar (normal/repeat/shuffle)"><i class="ph ph-repeat text-lg"></i></button>
+        <button id="prevBtn" class="text-neutral-300 hover:text-white p-2"><i class="ph-fill ph-skip-back text-xl"></i></button>
+        <button id="playBtn" class="w-11 h-11 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 transition shrink-0">
+          <i id="playIcon" class="ph-fill ph-play text-xl"></i>
+          <i id="pauseIcon" class="ph-fill ph-pause text-xl hidden"></i>
+          <i id="loadIcon" class="ph ph-circle-notch text-xl hidden animate-spin"></i>
+        </button>
+        <button id="nextBtn" class="text-neutral-300 hover:text-white p-2"><i class="ph-fill ph-skip-forward text-xl"></i></button>
+      </div>
+
+      <!-- kanan: volume (mute selalu tampil, slider desktop) -->
+      <div class="flex items-center gap-2 shrink-0 md:flex-1 md:justify-end group-hover-green">
+        <button id="queueBtn" class="text-neutral-300 hover:text-white p-2" title="Antrean"><i class="ph ph-queue text-lg"></i></button>
+        <button id="lyricsBtn" class="text-neutral-300 hover:text-white p-2" title="Lirik"><i class="ph ph-quotes text-lg"></i></button>
+        <button id="muteBtn" class="text-neutral-300 hover:text-white p-2" title="Mute (M)"><i class="ph ph-speaker-simple-high text-lg"></i></button>
+        <input id="vol" type="range" min="0" max="100" value="100" class="hidden md:block w-20 lg:w-28" aria-label="Volume" />
+      </div>
+    </div>
+  </footer>
+
+  <audio id="audio" preload="metadata"></audio>
+  <div id="toast" class="fixed bottom-28 left-1/2 -translate-x-1/2 bg-neutral-800 border border-neutral-700 text-white text-sm px-4 py-2 rounded-lg opacity-0 transition-opacity pointer-events-none z-50 max-w-[90vw] text-center"></div>
+
+  <style>
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { scrollbar-width: none; }
+    @media (min-width: 400px){ .xs\:inline { display: inline; } }
+  </style>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const audio = $('audio');
+    let tracks = [], queue = [], qIdx = -1, mode = 'normal', reqId = 0, seeking = false, audioUnlocked = false;
+    let currentTitle = 'Top Global', lyricsOpen = false, lyricsLines = [], lyricsSynced = false, lyricsForId = null, lastLyricIdx = -1, lastSearchQuery = '';
+    let autoplay = true, radioBusy = false, queueOpen = false, dragFrom = null;
+
+    // ---------- util ----------
+    const esc = (s) => (s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+    const fmt = (s) => (!s || isNaN(s)) ? '0:00' : `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+    function paintRange(el, pct){ el.style.setProperty('--val', pct + '%'); el.style.background = `linear-gradient(to right,#1db954 ${pct}%,#4b5563 ${pct}%)`; }
+    let toastTimer;
+    function toast(msg){ const t=$('toast'); t.textContent=msg; t.style.opacity='1'; clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.style.opacity='0',3000); }
+
+    // ---------- data ----------
+    async function loadList(url, title){
+      currentTitle = title; closePanels(); $('backBtn').classList.add('hidden');
+      $('sectionTitle').textContent = title;
+      $('trackList').innerHTML = skeleton();
+      try{
+        const data = await (await fetch(url)).json();
+        if(!Array.isArray(data)) throw new Error('Respons tidak valid');
+        tracks = data; render();
+      }catch(e){ $('trackList').innerHTML = `<p class="text-red-400 py-10 text-center text-sm">Gagal memuat: ${esc(e.message)}</p>`; }
+    }
+    const loadExplore = (type,title) => loadList(`/api/explore?type=${type}`, title);
+
+    async function doSearch(q){
+      q = (q||'').trim(); if(!q) return;
+      lastSearchQuery = q; currentTitle = `Hasil: ${q}`; closePanels(); $('backBtn').classList.add('hidden');
+      $('sectionTitle').textContent = currentTitle;
+      $('trackList').innerHTML = skeleton();
+      try{
+        const d = await (await fetch(`/api/search?q=${encodeURIComponent(q)}`)).json();
+        renderSearch(d);
+      }catch(e){ $('trackList').innerHTML = `<p class="text-red-400 py-10 text-center text-sm">Gagal memuat: ${esc(e.message)}</p>`; }
+    }
+
+    // ---------- render ----------
+    const skeleton = () => Array(9).fill('<div class="h-16 rounded-md bg-neutral-900 animate-pulse"></div>').join('');
+    const heading = (t) => `<h3 class="text-sm font-semibold text-neutral-300 mt-3 mb-2 px-1">${t}</h3>`;
+    function trackRowHTML(t,i){
+      return `
+        <div class="track group flex items-center gap-3 p-2 rounded-md hover:bg-neutral-800/70 cursor-pointer" data-i="${i}">
+          <div class="relative shrink-0">
+            <img src="${esc(t.cover)}" loading="lazy" onerror="this.style.opacity=0" class="w-12 h-12 rounded object-cover bg-neutral-800" />
+            <div class="absolute inset-0 hidden group-hover:flex items-center justify-center bg-black/40 rounded"><i class="ph-fill ph-play text-white"></i></div>
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="text-sm truncate track-title">${esc(t.title)}</div>
+            <div class="text-xs text-neutral-400 truncate">${esc(t.artist)}</div>
+          </div>
+          <button class="addq shrink-0 p-1 text-neutral-500 hover:text-white opacity-0 group-hover:opacity-100" title="Tambah ke antrean"><i class="ph ph-list-plus text-lg pointer-events-none"></i></button>
+          <i class="eq ph ph-music-note text-green-500 opacity-0 shrink-0"></i>
+        </div>`;
+    }
+    function wireTrackRows(){ highlight(); }   // klik via delegasi (lihat init)
+    function render(){
+      $('trackList').innerHTML = tracks.length ? tracks.map(trackRowHTML).join('')
+        : `<p class="text-neutral-500 py-10 text-center text-sm">Tidak ada hasil.</p>`;
+      wireTrackRows();
+    }
+    function renderSearch(d){
+      tracks = d.tracks || [];
+      let html = '';
+      if(d.artists && d.artists.length){
+        html += heading('Artis') + `<div class="flex gap-4 overflow-x-auto pb-2 no-scrollbar">` +
+          d.artists.map(a=>`
+            <div class="artist-card shrink-0 w-24 text-center cursor-pointer" data-id="${a.id}" data-name="${esc(a.name)}">
+              <div class="w-24 h-24 rounded-full bg-neutral-800 overflow-hidden flex items-center justify-center mb-1 hover:opacity-80">
+                ${a.cover ? `<img src="${esc(a.cover)}" class="w-full h-full object-cover">` : `<span class="text-3xl text-neutral-500">${esc((a.name||'?')[0])}</span>`}
+              </div>
+              <div class="text-xs truncate">${esc(a.name)}</div>
+            </div>`).join('') + `</div>`;
+      }
+      if(d.albums && d.albums.length){
+        html += heading('Album') + `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">` +
+          d.albums.map(a=>`
+            <div class="album-card cursor-pointer group" data-id="${a.id}" data-name="${esc(a.name)}" data-cover="${esc(a.cover)}">
+              <img src="${esc(a.cover)}" loading="lazy" onerror="this.style.opacity=0" class="w-full aspect-square rounded object-cover bg-neutral-800 mb-1 group-hover:opacity-80">
+              <div class="text-sm truncate">${esc(a.name)}</div>
+              <div class="text-xs text-neutral-400 truncate">${esc(a.artist)}</div>
+            </div>`).join('') + `</div>`;
+      }
+      if(d.playlists && d.playlists.length){
+        html += heading('Playlist') + `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">` +
+          d.playlists.map(p=>`
+            <div class="playlist-card cursor-pointer group" data-id="${p.id}" data-name="${esc(p.name)}">
+              <img src="${esc(p.cover)}" loading="lazy" onerror="this.style.opacity=0" class="w-full aspect-square rounded object-cover bg-neutral-800 mb-1 group-hover:opacity-80">
+              <div class="text-sm truncate">${esc(p.name)}</div>
+              <div class="text-xs text-neutral-400 truncate">${esc(p.owner||'Playlist')}</div>
+            </div>`).join('') + `</div>`;
+      }
+      if(tracks.length){ html += heading('Lagu') + tracks.map(trackRowHTML).join(''); }
+      $('trackList').innerHTML = html || `<p class="text-neutral-500 py-10 text-center text-sm">Tidak ada hasil.</p>`;
+      wireTrackRows();
+    }
+    async function openArtist(id, name){
+      if(!id){ $('searchInput').value = name; return doSearch(name); }   // fallback
+      $('trackList').innerHTML = skeleton();
+      try{ showTrackList(await (await fetch(`/api/artist?id=${id}`)).json(), `Artis • ${name}`); }
+      catch(e){ $('searchInput').value = name; doSearch(name); }         // fallback bila gagal
+    }
+    function showTrackList(list, title, cover){
+      if(cover) list.forEach(t => { if(!t.cover) t.cover = cover; });
+      tracks = list; currentTitle = title; closePanels();
+      $('sectionTitle').textContent = title;
+      $('backBtn').classList.toggle('hidden', !lastSearchQuery);
+      render(); $('trackList').scrollTop = 0;
+    }
+    async function openAlbum(id, name, cover){
+      $('trackList').innerHTML = skeleton();
+      try{ showTrackList(await (await fetch(`/api/album?id=${id}`)).json(), `Album • ${name}`, cover); }
+      catch(e){ $('trackList').innerHTML = `<p class="text-red-400 py-10 text-center text-sm">Gagal memuat album</p>`; }
+    }
+    async function openPlaylist(id, name){
+      $('trackList').innerHTML = skeleton();
+      try{ showTrackList(await (await fetch(`/api/playlist_tracks?id=${id}`)).json(), `Playlist • ${name}`); }
+      catch(e){ $('trackList').innerHTML = `<p class="text-red-400 py-10 text-center text-sm">Gagal memuat playlist</p>`; }
+    }
+    const curTrack = () => (qIdx >= 0 && qIdx < queue.length) ? queue[qIdx] : null;
+    function highlight(){
+      const cid = (curTrack() || {}).id;
+      document.querySelectorAll('.track').forEach(el=>{
+        const t = tracks[+el.dataset.i];
+        const on = !!(t && cid && t.id === cid);
+        el.classList.toggle('bg-neutral-800/70', on);
+        const ttl = el.querySelector('.track-title'); if(ttl) ttl.classList.toggle('text-green-500', on);
+        const eq = el.querySelector('.eq'); if(eq) eq.classList.toggle('opacity-0', !on);
+      });
+    }
+
+    // ---------- playback (model antrean/queue) ----------
+    function updateNowPlaying(t){
+      $('pCover').src = t.cover || ''; $('pCover').style.opacity = 1;
+      $('pTitle').textContent = t.title; $('pArtist').textContent = t.artist;
+      if('mediaSession' in navigator){
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: t.title||'', artist: t.artist||'', album: t.album||'',
+          artwork: t.cover ? [{src:t.cover, sizes:'640x640', type:'image/jpeg'}] : []
+        });
+      }
+    }
+    // klik lagu di daftar tampilan -> jadikan konteks itu sebagai antrean baru
+    function playAt(displayIndex){
+      if(displayIndex<0 || displayIndex>=tracks.length) return;
+      queue = tracks.slice(); qIdx = displayIndex; playCurrent();
+    }
+    function jumpQueue(qi){ if(qi>=0 && qi<queue.length){ qIdx = qi; playCurrent(); } }
+    async function playCurrent(){
+      const t = curTrack(); if(!t) return;
+      updateNowPlaying(t); highlight(); setLoading(true);
+      if(lyricsOpen) loadLyrics(t);
+      if(queueOpen) renderQueue();
+      maybePrefetchRadio();
+      const myReq = ++reqId;
+      try{
+        const q = encodeURIComponent(`${t.artist} ${t.title}`);
+        const res = await fetch(`/api/resolve?url=${encodeURIComponent(t.url)}&q=${q}`);
+        const d = await res.json().catch(()=>({}));
+        if(myReq !== reqId) return;                    // lagu sudah diganti -> abaikan respons basi
+        if(!res.ok || !d.success) throw new Error(d.detail || 'Audio tidak tersedia');
+        audio.src = d.streamUrl; await audio.play();
+      }catch(e){ if(myReq === reqId){ toast(e.message || 'Gagal memutar'); setLoading(false); } }
+    }
+    function togglePlay(){
+      if(!audio.src){ if(queue.length) jumpQueue(qIdx>=0?qIdx:0); else if(tracks.length) playAt(0); return; }
+      if(audio.paused) audio.play().catch(()=>toast('Tekan lagi untuk memutar'));
+      else audio.pause();
+    }
+    async function nextTrack(){
+      if(!queue.length) return;
+      if(mode==='shuffle'){ jumpQueue(Math.floor(Math.random()*queue.length)); return; }
+      if(qIdx < queue.length-1){ jumpQueue(qIdx+1); return; }
+      if(autoplay){                          // ujung antrean -> sambung radio
+        await prefetchRadio(true);
+        if(qIdx < queue.length-1){ jumpQueue(qIdx+1); return; }
+      }
+      jumpQueue(0);                          // fallback: ulang dari awal
+    }
+    const prevTrack = () => {
+      if(!queue.length) return;
+      if(audio.currentTime > 3){ audio.currentTime = 0; return; }   // seperti Spotify: restart dulu
+      jumpQueue((qIdx-1+queue.length)%queue.length);
+    };
+    function maybePrefetchRadio(){
+      if(autoplay && !radioBusy && (queue.length - 1 - qIdx) <= 2) prefetchRadio(false);
+    }
+    async function prefetchRadio(force){
+      if(!autoplay || radioBusy) return;
+      const cur = curTrack();
+      if(!cur || !cur.artistId) return;
+      if(!force && (queue.length - 1 - qIdx) > 2) return;
+      radioBusy = true;
+      const ref = queue;                     // guard: batalkan bila antrean sudah diganti
+      try{
+        const add = await (await fetch(`/api/radio?artist_id=${cur.artistId}&seed=${encodeURIComponent(cur.id)}&limit=20`)).json();
+        if(queue !== ref || !Array.isArray(add)) return;
+        const have = new Set(queue.map(t=>t.id));
+        const fresh = add.filter(t => t && t.id && !have.has(t.id));
+        if(fresh.length){ queue.push(...fresh); if(queueOpen) renderQueue(); }
+      }catch(e){}
+      finally{ radioBusy = false; }
+    }
+    // tambah 1 lagu ke antrean tepat setelah lagu sekarang (Add to queue)
+    function addToQueue(t){
+      if(!t) return;
+      if(!queue.length){ queue=[t]; qIdx=0; playCurrent(); }
+      else queue.splice(qIdx+1, 0, t);
+      if(queueOpen) renderQueue();
+      toast('Ditambahkan ke antrean');
+    }
+
+    // ---------- ikon play/loading ----------
+    function syncPlayIcon(){
+      $('loadIcon').classList.add('hidden');
+      const playing = audio.src && !audio.paused && !audio.ended;
+      $('playIcon').classList.toggle('hidden', !!playing);
+      $('pauseIcon').classList.toggle('hidden', !playing);
+    }
+    function setLoading(on){
+      if(on){ $('loadIcon').classList.remove('hidden'); $('playIcon').classList.add('hidden'); $('pauseIcon').classList.add('hidden'); }
+      else syncPlayIcon();
+    }
+
+    // ---------- volume & mute ----------
+    function updateVolIcon(){
+      const v = audio.muted ? 0 : audio.volume;
+      const ic = v===0 ? 'ph-speaker-simple-x' : v<0.5 ? 'ph-speaker-simple-low' : 'ph-speaker-simple-high';
+      $('muteBtn').innerHTML = `<i class="ph ${ic} text-lg"></i>`;
+      paintRange($('vol'), v*100); $('vol').value = v*100;
+    }
+    function setVolume(v){ v=Math.min(1,Math.max(0,v)); audio.volume=v; audio.muted = v===0; localStorage.setItem('vol', v); updateVolIcon(); }
+    function toggleMute(){
+      audio.muted = !audio.muted;
+      if(!audio.muted && audio.volume===0) setVolume(0.5);
+      localStorage.setItem('muted', audio.muted); updateVolIcon();
+    }
+
+    // ---------- events: kontrol ----------
+    $('searchForm').addEventListener('submit', e => { e.preventDefault(); doSearch($('searchInput').value); });
+    $('backBtn').addEventListener('click', () => { if(lastSearchQuery) doSearch(lastSearchQuery); });
+    // delegasi klik untuk semua kartu/baris di trackList (agar bisa append tanpa re-wire)
+    $('trackList').addEventListener('click', e => {
+      const aq = e.target.closest('.addq');         if(aq){ addToQueue(tracks[+aq.closest('.track').dataset.i]); return; }
+      const tr = e.target.closest('.track');        if(tr){ playAt(+tr.dataset.i); return; }
+      const ar = e.target.closest('.artist-card');  if(ar){ openArtist(ar.dataset.id, ar.dataset.name); return; }
+      const al = e.target.closest('.album-card');    if(al){ openAlbum(al.dataset.id, al.dataset.name, al.dataset.cover); return; }
+      const pl = e.target.closest('.playlist-card'); if(pl){ openPlaylist(pl.dataset.id, pl.dataset.name); return; }
+    });
+    $('autoplayBtn').addEventListener('click', () => {
+      autoplay = !autoplay; localStorage.setItem('autoplay', autoplay);
+      $('autoplayBtn').classList.toggle('text-green-500', autoplay);
+      $('autoplayBtn').classList.toggle('text-neutral-400', !autoplay);
+      toast('Autoplay ' + (autoplay ? 'aktif — queue radio otomatis' : 'mati'));
+      if(autoplay) maybePrefetchRadio();
+    });
+    document.querySelectorAll('.cat').forEach(b => b.addEventListener('click', () => loadExplore(b.dataset.type, b.dataset.title)));
+    $('playBtn').addEventListener('click', togglePlay);
+    $('nextBtn').addEventListener('click', nextTrack);
+    $('prevBtn').addEventListener('click', prevTrack);
+    $('muteBtn').addEventListener('click', toggleMute);
+    $('modeBtn').addEventListener('click', () => {
+      mode = mode==='normal' ? 'repeat' : mode==='repeat' ? 'shuffle' : 'normal';
+      const ic = { normal:'ph-repeat', repeat:'ph-repeat-once', shuffle:'ph-shuffle' }[mode];
+      $('modeBtn').innerHTML = `<i class="ph ${ic} text-lg"></i>`;
+      $('modeBtn').classList.toggle('text-green-500', mode!=='normal');
+      $('modeBtn').classList.toggle('text-neutral-400', mode==='normal');
+      toast('Mode: ' + mode);
+    });
+    $('vol').addEventListener('input', e => setVolume(e.target.value/100));
+    $('seek').addEventListener('input', e => { seeking=true; const p=+e.target.value; paintRange($('seek'),p); if(audio.duration) $('curTime').textContent=fmt(p/100*audio.duration); });
+    $('seek').addEventListener('change', e => { if(audio.duration) audio.currentTime = (+e.target.value/100)*audio.duration; seeking=false; });
+
+    // ---------- events: audio ----------
+    audio.addEventListener('waiting', () => setLoading(true));
+    audio.addEventListener('playing', () => setLoading(false));
+    audio.addEventListener('canplay', () => setLoading(false));
+    audio.addEventListener('play', syncPlayIcon);
+    audio.addEventListener('pause', syncPlayIcon);
+    audio.addEventListener('ended', () => mode==='repeat' ? (audio.currentTime=0, audio.play()) : nextTrack());
+    audio.addEventListener('error', () => { if(audio.src){ setLoading(false); toast('Stream gagal — kemungkinan URL kedaluwarsa, coba lagi'); } });
+    audio.addEventListener('timeupdate', () => {
+      syncLyrics();
+      if(seeking) return;
+      $('curTime').textContent = fmt(audio.currentTime);
+      const p = audio.duration ? (audio.currentTime/audio.duration)*100 : 0;
+      paintRange($('seek'), p); $('seek').value = p;
+    });
+    audio.addEventListener('loadedmetadata', () => $('durTime').textContent = fmt(audio.duration));
+
+    // ---------- Media Session (kontrol lockscreen HP) ----------
+    if('mediaSession' in navigator){
+      navigator.mediaSession.setActionHandler('play', () => audio.play());
+      navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+      navigator.mediaSession.setActionHandler('previoustrack', prevTrack);
+      navigator.mediaSession.setActionHandler('nexttrack', nextTrack);
+    }
+
+    // ---------- keyboard ----------
+    document.addEventListener('keydown', e => {
+      if(['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
+      if(e.code==='Space'){ e.preventDefault(); togglePlay(); }
+      else if(e.key.toLowerCase()==='m'){ toggleMute(); }
+      else if(e.key==='ArrowRight' && audio.duration){ audio.currentTime = Math.min(audio.duration, audio.currentTime+5); }
+      else if(e.key==='ArrowLeft' && audio.duration){ audio.currentTime = Math.max(0, audio.currentTime-5); }
+    });
+
+    // ---------- unlock audio di HP (agar play() setelah fetch tidak diblokir) ----------
+    document.addEventListener('pointerdown', () => {
+      if(audioUnlocked) return; audioUnlocked = true;
+      audio.play().then(()=>audio.pause()).catch(()=>{});
+    }, { once:true });
+
+    // ---------- lirik (sinkron LRC) ----------
+    function parseLRC(text){
+      const out=[];
+      for(const line of text.split('\n')){
+        const tags=[...line.matchAll(/\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?\]/g)];
+        const txt=line.replace(/\[[^\]]*\]/g,'').trim();
+        for(const g of tags){ out.push({ t:+g[1]*60 + +g[2] + (g[3]?parseFloat('0.'+g[3]):0), text:txt }); }
+      }
+      return out.sort((a,b)=>a.t-b.t);
+    }
+    function renderLyrics(){
+      if(!lyricsLines.length){ $('lyricsView').innerHTML='<p class="text-neutral-500 py-10 text-center text-sm">Lirik tidak tersedia untuk lagu ini.</p>'; return; }
+      $('lyricsView').innerHTML = lyricsLines.map((l,i)=>`<p class="lyric-line py-1.5 text-center transition-all duration-200 ${lyricsSynced?'text-neutral-500':'text-neutral-300'}" data-i="${i}">${esc(l.text)||'♪'}</p>`).join('');
+      lastLyricIdx=-1;
+    }
+    async function loadLyrics(t){
+      lyricsForId=t.id; lastLyricIdx=-1;
+      $('lyricsView').innerHTML='<p class="text-neutral-500 py-10 text-center text-sm">Memuat lirik…</p>';
+      try{
+        const d=await (await fetch(`/api/lyrics?artist=${encodeURIComponent(t.artist)}&title=${encodeURIComponent(t.title)}`)).json();
+        if(!d.success || !d.lyrics) throw 0;
+        lyricsSynced=!!d.synced;
+        lyricsLines = d.synced ? parseLRC(d.lyrics) : [];
+        if(!lyricsLines.length){ lyricsSynced=false; lyricsLines=d.lyrics.split('\n').map(x=>({t:null,text:x})); }
+        renderLyrics(); syncLyrics();
+      }catch(e){ lyricsLines=[]; renderLyrics(); }
+    }
+    function syncLyrics(){
+      if(!lyricsOpen || !lyricsSynced || !lyricsLines.length) return;
+      const ct=audio.currentTime; let cur=-1;
+      for(let i=0;i<lyricsLines.length;i++){ if(lyricsLines[i].t<=ct+0.15) cur=i; else break; }
+      if(cur===lastLyricIdx) return;
+      lastLyricIdx=cur;
+      const nodes=$('lyricsView').querySelectorAll('.lyric-line');
+      nodes.forEach((n,i)=>{ const on=i===cur;
+        n.classList.toggle('text-white',on); n.classList.toggle('font-semibold',on); n.classList.toggle('text-neutral-500',!on);
+      });
+      if(cur>=0 && nodes[cur]) nodes[cur].scrollIntoView({block:'center',behavior:'smooth'});
+    }
+    function refreshMainView(){
+      $('lyricsView').classList.toggle('hidden', !lyricsOpen);
+      $('queueView').classList.toggle('hidden', !queueOpen);
+      $('trackList').classList.toggle('hidden', lyricsOpen || queueOpen);
+      $('lyricsBtn').classList.toggle('text-green-500', lyricsOpen);
+      $('queueBtn').classList.toggle('text-green-500', queueOpen);
+      $('sectionTitle').textContent = queueOpen ? 'Antrean' : (lyricsOpen ? 'Lirik' : currentTitle);
+    }
+    function closePanels(){ if(queueOpen || lyricsOpen){ queueOpen = false; lyricsOpen = false; refreshMainView(); } }
+    function toggleLyrics(){
+      lyricsOpen = !lyricsOpen; if(lyricsOpen) queueOpen = false;
+      refreshMainView();
+      if(lyricsOpen){
+        const t = curTrack();
+        if(t){ if(lyricsForId !== t.id) loadLyrics(t); else syncLyrics(); }
+        else $('lyricsView').innerHTML='<p class="text-neutral-500 py-10 text-center text-sm">Putar lagu untuk melihat lirik.</p>';
+      }
+    }
+    $('lyricsBtn').addEventListener('click', toggleLyrics);
+
+    // ---------- panel Antrean (queue) ----------
+    function toggleQueue(){
+      queueOpen = !queueOpen; if(queueOpen) lyricsOpen = false;
+      refreshMainView();
+      if(queueOpen) renderQueue();
+    }
+    function qRowHTML(t, i, up){
+      return `
+        <div class="qrow group flex items-center gap-2 p-2 rounded-md ${i===qIdx?'bg-neutral-800/70':''} hover:bg-neutral-800/70" data-i="${i}" ${up?'draggable="true"':''}>
+          ${up ? `<i class="ph ph-dots-six-vertical text-neutral-500 cursor-grab shrink-0"></i>`
+               : `<i class="ph-fill ph-speaker-high text-green-500 shrink-0"></i>`}
+          <img src="${esc(t.cover)}" onerror="this.style.opacity=0" class="w-10 h-10 rounded object-cover bg-neutral-800 shrink-0 pointer-events-none">
+          <div class="qplay min-w-0 flex-1 cursor-pointer">
+            <div class="text-sm truncate ${i===qIdx?'text-green-500':''}">${esc(t.title)}</div>
+            <div class="text-xs text-neutral-400 truncate">${esc(t.artist)}</div>
+          </div>
+          ${up ? `<div class="flex items-center shrink-0 text-neutral-500">
+            <button class="qup p-1 hover:text-white" title="Naik"><i class="ph ph-caret-up pointer-events-none"></i></button>
+            <button class="qdown p-1 hover:text-white" title="Turun"><i class="ph ph-caret-down pointer-events-none"></i></button>
+            <button class="qremove p-1 hover:text-white" title="Hapus"><i class="ph ph-x pointer-events-none"></i></button>
+          </div>` : ''}
+        </div>`;
+    }
+    function renderQueue(){
+      const cur = curTrack();
+      const upnext = queue.slice(qIdx+1);
+      let html = `<h3 class="text-sm font-semibold text-neutral-300 mb-2 px-1">Sedang diputar</h3>`;
+      html += cur ? qRowHTML(cur, qIdx, false) : `<p class="text-neutral-500 text-sm px-1">Belum ada lagu.</p>`;
+      html += `<div class="flex items-center justify-between mt-4 mb-2 px-1">
+                 <h3 class="text-sm font-semibold text-neutral-300">Berikutnya</h3>
+                 ${upnext.length?`<button id="clearQ" class="text-xs text-neutral-400 hover:text-white">Bersihkan</button>`:''}
+               </div>`;
+      html += upnext.length ? upnext.map((t,k)=>qRowHTML(t, qIdx+1+k, true)).join('')
+        : `<p class="text-neutral-500 text-sm px-1">Antrean kosong.${autoplay?' Autoplay akan menambah lagu serupa.':''}</p>`;
+      $('queueView').innerHTML = html;
+      const c = $('clearQ'); if(c) c.addEventListener('click', () => { queue = queue.slice(0, qIdx+1); renderQueue(); });
+    }
+    function moveInQueue(from, to){       // drag & drop: pindah 'from' ke posisi 'to'
+      if(from<=qIdx || to<=qIdx || from===to || from>=queue.length) return;   // hanya "Berikutnya"
+      const [it] = queue.splice(from, 1);
+      queue.splice(from < to ? to-1 : to, 0, it);
+      renderQueue();
+    }
+    function swapQueue(i, j){             // tombol naik/turun: tukar dengan tetangga
+      if(i<=qIdx || j<=qIdx || i>=queue.length || j>=queue.length || i===j) return;
+      [queue[i], queue[j]] = [queue[j], queue[i]];
+      renderQueue();
+    }
+    function removeFromQueue(i){
+      if(i<=qIdx || i>=queue.length) return;
+      queue.splice(i, 1); renderQueue();
+    }
+    $('queueBtn').addEventListener('click', toggleQueue);
+    $('queueView').addEventListener('click', e => {
+      const up = e.target.closest('.qup');     if(up){ const i=+up.closest('.qrow').dataset.i; swapQueue(i, i-1); return; }
+      const dn = e.target.closest('.qdown');   if(dn){ const i=+dn.closest('.qrow').dataset.i; swapQueue(i, i+1); return; }
+      const rm = e.target.closest('.qremove'); if(rm){ removeFromQueue(+rm.closest('.qrow').dataset.i); return; }
+      const pl = e.target.closest('.qplay');   if(pl){ jumpQueue(+pl.closest('.qrow').dataset.i); return; }
+    });
+    // reorder drag & drop (desktop) — item "Berikutnya" saja
+    $('queueView').addEventListener('dragstart', e => { const r=e.target.closest('.qrow'); if(!r||!r.draggable) return; dragFrom=+r.dataset.i; e.dataTransfer.effectAllowed='move'; r.classList.add('opacity-50'); });
+    $('queueView').addEventListener('dragend',   e => { const r=e.target.closest('.qrow'); if(r) r.classList.remove('opacity-50'); dragFrom=null; });
+    $('queueView').addEventListener('dragover',  e => { e.preventDefault(); e.dataTransfer.dropEffect='move'; });
+    $('queueView').addEventListener('drop',      e => { e.preventDefault(); const r=e.target.closest('.qrow'); if(r && dragFrom!=null) moveInQueue(dragFrom, +r.dataset.i); });
+
+    // ---------- PWA: service worker + tombol install ----------
+    if('serviceWorker' in navigator){
+      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+    }
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault(); deferredPrompt = e;
+      $('installBtn').classList.remove('hidden'); $('installBtn').classList.add('flex');
+    });
+    $('installBtn').addEventListener('click', async () => {
+      if(!deferredPrompt) return;
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null; $('installBtn').classList.add('hidden');
+    });
+    window.addEventListener('appinstalled', () => { $('installBtn').classList.add('hidden'); toast('Terpasang! Buka dari layar utama.'); });
+
+    // ---------- init ----------
+    (function init(){
+      const savedVol = parseFloat(localStorage.getItem('vol'));
+      audio.volume = isNaN(savedVol) ? 1 : savedVol;
+      audio.muted = localStorage.getItem('muted') === 'true';
+      autoplay = localStorage.getItem('autoplay') !== 'false';
+      $('autoplayBtn').classList.toggle('text-green-500', autoplay);
+      $('autoplayBtn').classList.toggle('text-neutral-400', !autoplay);
+      updateVolIcon(); paintRange($('seek'), 0);
+      loadExplore('global', 'Top Global');
+    })();
+  </script>
+</body>
+</html>
