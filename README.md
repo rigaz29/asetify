@@ -45,6 +45,14 @@ python3 -m venv .venv
 ```
 Tidak perlu API key, cookies, ffmpeg, atau Deno.
 
+### Tailwind CSS (build lokal)
+`static/tailwind.css` sudah di-build & di-commit, jadi menjalankan app **tidak butuh Node**. Rebuild hanya perlu saat kamu menambah/mengubah class Tailwind di `static/index.html`:
+```bash
+npm install          # sekali, pasang tailwindcss
+npm run build:css    # rebuild static/tailwind.css (minified)
+npm run watch:css    # opsional: rebuild otomatis saat edit
+```
+
 ### Lirik penuh (opsional)
 Jalankan Lyrica sebagai sidecar agar lirik pakai 7 sumber (tanpa ini, lirik tetap jalan via LRCLIB):
 ```bash

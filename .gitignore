@@ -5,6 +5,9 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Node (build Tailwind) — static/tailwind.css hasil build TETAP di-commit
+node_modules/
+
 # Secrets / sesi (jangan pernah di-commit)
 .env
 cookies.txt
